@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>授粉观察数据可视化</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            font-family: Arial, sans-serif;
+        }
+        #map {
+            height: 100%;
+            height: 100vh;
+        }
+        .header {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            color: #2c3e50;
+        }
+        .search-container {
+            position: absolute;
+            top: 80px;
+            right: 10px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        .search-input {
+            padding: 8px 12px;
+            width: 250px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            outline: none;
+        }
+        .search-input:focus {
+            border-color: #3498db;
+        }
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 5px;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+        }
+        .search-results.show {
+            display: block;
+        }
+        .search-result-item {
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+        .search-result-item:hover {
+            background: #f5f5f5;
+        }
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+        .search-result-name {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .search-result-type {
+            font-size: 12px;
+            color: #666;
+            margin-top: 2px;
+        }
+        .control-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            min-width: 220px;
+        }
+        .control-panel h3 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+            font-size: 16px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 5px;
+        }
+        .layer-control {
+            margin-bottom: 15px;
+        }
+        .layer-control label {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            cursor: pointer;
+        }
+        .layer-control input[type="checkbox"] {
+            margin-right: 10px;
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .slider-control {
+            margin: 10px 0;
+        }
+        .slider-control label {
+            display: block;
+            font-size: 13px;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        .slider-control input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+        .slider-value {
+            text-align: right;
+            font-size: 12px;
+            color: #3498db;
+            font-weight: bold;
+        }
+        .stats-panel {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            min-width: 240px;
+        }
+        .stats-panel h3 {
+            margin: 0 0 12px 0;
+            color: #2c3e50;
+            font-size: 16px;
+            border-bottom: 2px solid #27ae60;
+            padding-bottom: 5px;
+        }
+        .stat-item {
+            margin: 8px 0;
+            font-size: 14px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .stat-label {
+            color: #666;
+        }
+        .stat-value {
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .heatmap-legend {
+            position: absolute;
+            bottom: 30px;
+            right: 30px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        .heatmap-gradient {
+            width: 200px;
+            height: 20px;
+            background: linear-gradient(to right, #0000FF, #00FF00, #FFFF00, #FF0000);
+            border-radius: 4px;
+            margin: 8px 0;
+        }
+        .heatmap-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #666;
+        }
+        .status-legend {
+            position: absolute;
+            bottom: 150px;
+            right: 30px;
+            z-index: 1000;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+        }
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+            border: 2px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🗺️ 授粉观察数据可视化</h1>
+    </div>
+    
+    <div class="control-panel">
+        <h3>📊 图层控制</h3>
+        <div class="layer-control">
+            <label>
+                <input type="checkbox" id="heatmapToggle" checked>
+                🌡️ 热力图
+            </label>
+            <label>
+                <input type="checkbox" id="markersToggle" checked>
+                📍 标记点
+            </label>
+            <label>
+                <input type="checkbox" id="clusterToggle" checked>
+                🔵 聚类视图
+            </label>
+        </div>
+        
+        <h3>🎛️ 热力图参数</h3>
+        <div class="slider-control">
+            <label>半径</label>
+            <input type="range" id="radiusSlider" min="10" max="50" value="20">
+            <div class="slider-value" id="radiusValue">20</div>
+        </div>
+        <div class="slider-control">
+            <label>模糊度</label>
+            <input type="range" id="blurSlider" min="5" max="30" value="15">
+            <div class="slider-value" id="blurValue">15</div>
+        </div>
+        <div class="slider-control">
+            <label>强度</label>
+            <input type="range" id="intensitySlider" min="0.1" max="2" step="0.1" value="1.0">
+            <div class="slider-value" id="intensityValue">1.0</div>
+        </div>
+    </div>
+    
+    <div class="search-container">
+        <input type="text" class="search-input" id="searchInput" placeholder="搜索地点名称...">
+        <div class="search-results" id="searchResults"></div>
+    </div>
+    
+    <div id="map"></div>
+    
+    <div class="stats-panel">
+        <h3>📈 统计信息</h3>
+        <div class="stat-item">
+            <span class="stat-label">总观察点数</span>
+            <span class="stat-value" id="totalPoints">40</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">平均观察数量</span>
+            <span class="stat-value" id="avgCount">-</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">高活跃度</span>
+            <span class="stat-value" id="highCount">-</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">中活跃度</span>
+            <span class="stat-value" id="mediumCount">-</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">低活跃度</span>
+            <span class="stat-value" id="lowCount">-</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">🐝 蜜蜂</span>
+            <span class="stat-value" id="beeCount">-</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">🦋 蝴蝶</span>
+            <span class="stat-value" id="butterflyCount">-</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">🐻 熊蜂</span>
+            <span class="stat-value" id="bumblebeeCount">-</span>
+        </div>
+    </div>
+    
+    <div class="heatmap-legend">
+        <div style="font-weight: bold; color: #2c3e50; margin-bottom: 5px;">热力图密度</div>
+        <div class="heatmap-gradient"></div>
+        <div class="heatmap-labels">
+            <span>低密度</span>
+            <span>高密度</span>
+        </div>
+    </div>
+    
+    <div class="status-legend">
+        <div class="legend-item">
+            <div class="legend-color" style="background: #27ae60;"></div>
+            <span>高 - 高活跃度</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #f39c12;"></div>
+            <span>中 - 中活跃度</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-color" style="background: #e74c3c;"></div>
+            <span>低 - 低活跃度</span>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+    <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script>
+        // 内嵌的观察数据
+        const data = [
+            {"name":"未名湖畔","lat":39.9928,"lng":116.3043,"status":"高","count":45,"type":"蜜蜂"},
+            {"name":"静园草坪","lat":39.9901,"lng":116.3074,"status":"中","count":20,"type":"蝴蝶"},
+            {"name":"燕南园","lat":39.9876,"lng":116.3058,"status":"低","count":8,"type":"熊蜂"},
+            {"name":"博雅塔下","lat":39.9932,"lng":116.3025,"status":"高","count":38,"type":"蜜蜂"},
+            {"name":"五四体育场","lat":39.9865,"lng":116.3121,"status":"中","count":12,"type":"蝴蝶"},
+            {"name":"图书馆东草坪","lat":39.9953,"lng":116.3102,"status":"高","count":42,"type":"蜜蜂"},
+            {"name":"理科教学楼区","lat":39.9887,"lng":116.3098,"status":"中","count":18,"type":"蝴蝶"},
+            {"name":"朗润园","lat":39.9915,"lng":116.3017,"status":"高","count":36,"type":"熊蜂"},
+            {"name":"勺园","lat":39.9859,"lng":116.3035,"status":"低","count":6,"type":"蜜蜂"},
+            {"name":"百周年纪念讲堂","lat":39.9892,"lng":116.3115,"status":"中","count":22,"type":"蝴蝶"},
+            {"name":"文史楼旁花园","lat":39.9908,"lng":116.3089,"status":"高","count":48,"type":"蜜蜂"},
+            {"name":"医学部教学楼","lat":39.9851,"lng":116.3062,"status":"低","count":9,"type":"熊蜂"},
+            {"name":"邱德拔体育馆","lat":39.9879,"lng":116.3138,"status":"中","count":15,"type":"蝴蝶"},
+            {"name":"国际关系学院","lat":39.9921,"lng":116.3056,"status":"高","count":33,"type":"蜜蜂"},
+            {"name":"法学院附近","lat":39.9896,"lng":116.3043,"status":"中","count":20,"type":"蝴蝶"},
+            {"name":"未名湖北岸","lat":39.9941,"lng":116.3038,"status":"高","count":40,"type":"蜜蜂"},
+            {"name":"校史馆前","lat":39.9882,"lng":116.3108,"status":"低","count":7,"type":"熊蜂"},
+            {"name":"新太阳学生中心","lat":39.9871,"lng":116.3085,"status":"中","count":17,"type":"蝴蝶"},
+            {"name":"勺园荷花池","lat":39.9845,"lng":116.3048,"status":"中","count":16,"type":"蜜蜂"},
+            {"name":"理科一号楼前","lat":39.9890,"lng":116.3103,"status":"高","count":41,"type":"蝴蝶"},
+            {"name":"考古与艺术博物馆","lat":39.9902,"lng":116.3021,"status":"低","count":5,"type":"熊蜂"},
+            {"name":"外国语学院花园","lat":39.9924,"lng":116.3067,"status":"高","count":37,"type":"蜜蜂"},
+            {"name":"光华管理学院","lat":39.9863,"lng":116.3110,"status":"中","count":19,"type":"蝴蝶"},
+            {"name":"王克桢楼周边","lat":39.9918,"lng":116.3095,"status":"高","count":44,"type":"蜜蜂"},
+            {"name":"中关新园","lat":39.9836,"lng":116.3082,"status":"低","count":7,"type":"熊蜂"},
+            {"name":"生命科学学院实验田","lat":39.9888,"lng":116.3059,"status":"高","count":52,"type":"蜜蜂"},
+            {"name":"第二教学楼旁","lat":39.9873,"lng":116.3078,"status":"中","count":14,"type":"蝴蝶"},
+            {"name":"畅春园遗址","lat":39.9852,"lng":116.2998,"status":"低","count":4,"type":"熊蜂"},
+            {"name":"教育学院小花园","lat":39.9936,"lng":116.3081,"status":"高","count":39,"type":"蜜蜂"},
+            {"name":"校医院旁绿地","lat":39.9869,"lng":116.3041,"status":"中","count":18,"type":"蝴蝶"},
+            {"name":"人文学苑","lat":39.9912,"lng":116.3034,"status":"高","count":46,"type":"蜜蜂"},
+            {"name":"电教楼周边","lat":39.9895,"lng":116.3065,"status":"中","count":21,"type":"蝴蝶"},
+            {"name":"遥感楼前","lat":39.9931,"lng":116.3050,"status":"高","count":43,"type":"蜜蜂"},
+            {"name":"学生宿舍32楼","lat":39.9877,"lng":116.3091,"status":"低","count":6,"type":"熊蜂"},
+            {"name":"经济学院东侧","lat":39.9906,"lng":116.3072,"status":"中","count":17,"type":"蝴蝶"},
+            {"name":"新化学楼南","lat":39.9929,"lng":116.3076,"status":"高","count":48,"type":"蜜蜂"},
+            {"name":"学生宿舍45甲","lat":39.9858,"lng":116.3054,"status":"低","count":8,"type":"熊蜂"},
+            {"name":"物理学院北园","lat":39.9899,"lng":116.3092,"status":"中","count":23,"type":"蝴蝶"},
+            {"name":"英杰交流中心","lat":39.9884,"lng":116.3123,"status":"中","count":20,"type":"蜜蜂"},
+            {"name":"未名湖南路","lat":39.9915,"lng":116.3028,"status":"高","count":35,"type":"蜜蜂"}
+        ];
+
+        // 根据status获取颜色
+        function getColor(status) {
+            switch(status) {
+                case '高': return '#27ae60';
+                case '中': return '#f39c12';
+                case '低': return '#e74c3c';
+                default: return '#3498db';
+            }
+        }
+
+        // 初始化地图
+        const map = L.map('map');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+        }).addTo(map);
+
+        // 计算边界以包含所有点
+        const bounds = L.latLngBounds(data.map(p => [p.lat, p.lng]));
+        map.fitBounds(bounds, { padding: [50, 50] });
+
+        // 准备热力图数据
+        const maxCount = Math.max(...data.map(p => p.count));
+        let heatData = data.map(p => [p.lat, p.lng, p.count / maxCount]);
+
+        // 创建热力图图层
+        let heatLayer = L.heatLayer(heatData, {
+            radius: 20,
+            blur: 15,
+            max: 1.0,
+            gradient: {
+                0.0: '#0000FF',
+                0.33: '#00FF00',
+                0.66: '#FFFF00',
+                1.0: '#FF0000'
+            }
+        }).addTo(map);
+
+        // 保存所有标记点
+        const markers = [];
+        const markerGroup = L.layerGroup();
+        const clusterGroup = L.markerClusterGroup({
+            showCoverageOnHover: false,
+            maxClusterRadius: 50
+        });
+
+        // 生成标记点
+        data.forEach(point => {
+            const color = getColor(point.status);
+            const marker = L.circleMarker([point.lat, point.lng], {
+                radius: 6,
+                fillColor: color,
+                color: '#fff',
+                weight: 2,
+                opacity: 1,
+                fillOpacity: 0.8
+            });
+
+            const popupContent = `
+                <div style="min-width: 150px;">
+                    <h3 style="margin: 0 0 10px 0; color: #2c3e50;">${point.name}</h3>
+                    <p><strong>类型：</strong>${point.type}</p>
+                    <p><strong>观察数量：</strong>${point.count} 只</p>
+                    <p><strong>授粉等级：</strong><span style="color: ${color}; font-weight: bold;">${point.status}</span></p>
+                </div>
+            `;
+            marker.bindPopup(popupContent);
+            
+            markers.push({ point, marker });
+            markerGroup.addLayer(marker);
+            clusterGroup.addLayer(marker);
+        });
+
+        // 添加图层到地图
+        markerGroup.addTo(map);
+        clusterGroup.addTo(map);
+
+        // 计算统计信息
+        function calculateStats() {
+            const totalCount = data.reduce((sum, p) => sum + p.count, 0);
+            const avgCount = (totalCount / data.length).toFixed(1);
+            
+            const highCount = data.filter(p => p.status === '高').length;
+            const mediumCount = data.filter(p => p.status === '中').length;
+            const lowCount = data.filter(p => p.status === '低').length;
+            
+            const beeCount = data.filter(p => p.type === '蜜蜂').length;
+            const butterflyCount = data.filter(p => p.type === '蝴蝶').length;
+            const bumblebeeCount = data.filter(p => p.type === '熊蜂').length;
+            
+            document.getElementById('totalPoints').textContent = data.length;
+            document.getElementById('avgCount').textContent = avgCount;
+            document.getElementById('highCount').textContent = `${highCount} (${((highCount/data.length)*100).toFixed(0)}%)`;
+            document.getElementById('mediumCount').textContent = `${mediumCount} (${((mediumCount/data.length)*100).toFixed(0)}%)`;
+            document.getElementById('lowCount').textContent = `${lowCount} (${((lowCount/data.length)*100).toFixed(0)}%)`;
+            document.getElementById('beeCount').textContent = `${beeCount} (${((beeCount/data.length)*100).toFixed(0)}%)`;
+            document.getElementById('butterflyCount').textContent = `${butterflyCount} (${((butterflyCount/data.length)*100).toFixed(0)}%)`;
+            document.getElementById('bumblebeeCount').textContent = `${bumblebeeCount} (${((bumblebeeCount/data.length)*100).toFixed(0)}%)`;
+        }
+        calculateStats();
+
+        // 图层控制
+        const heatmapToggle = document.getElementById('heatmapToggle');
+        const markersToggle = document.getElementById('markersToggle');
+        const clusterToggle = document.getElementById('clusterToggle');
+
+        heatmapToggle.addEventListener('change', () => {
+            if (heatmapToggle.checked) {
+                heatLayer.addTo(map);
+            } else {
+                map.removeLayer(heatLayer);
+            }
+        });
+
+        markersToggle.addEventListener('change', () => {
+            if (markersToggle.checked) {
+                markerGroup.addTo(map);
+            } else {
+                map.removeLayer(markerGroup);
+            }
+        });
+
+        clusterToggle.addEventListener('change', () => {
+            if (clusterToggle.checked) {
+                clusterGroup.addTo(map);
+            } else {
+                map.removeLayer(clusterGroup);
+            }
+        });
+
+        // 热力图参数控制
+        const radiusSlider = document.getElementById('radiusSlider');
+        const blurSlider = document.getElementById('blurSlider');
+        const intensitySlider = document.getElementById('intensitySlider');
+
+        function updateHeatmap() {
+            const radius = parseInt(radiusSlider.value);
+            const blur = parseInt(blurSlider.value);
+            const intensity = parseFloat(intensitySlider.value);
+            
+            document.getElementById('radiusValue').textContent = radius;
+            document.getElementById('blurValue').textContent = blur;
+            document.getElementById('intensityValue').textContent = intensity.toFixed(1);
+            
+            map.removeLayer(heatLayer);
+            heatLayer = L.heatLayer(heatData, {
+                radius: radius,
+                blur: blur,
+                max: intensity,
+                gradient: {
+                    0.0: '#0000FF',
+                    0.33: '#00FF00',
+                    0.66: '#FFFF00',
+                    1.0: '#FF0000'
+                }
+            });
+            
+            if (heatmapToggle.checked) {
+                heatLayer.addTo(map);
+            }
+        }
+
+        radiusSlider.addEventListener('input', updateHeatmap);
+        blurSlider.addEventListener('input', updateHeatmap);
+        intensitySlider.addEventListener('input', updateHeatmap);
+
+        // 搜索功能
+        const searchInput = document.getElementById('searchInput');
+        const searchResults = document.getElementById('searchResults');
+
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim().toLowerCase();
+            if (query === '') {
+                searchResults.classList.remove('show');
+                searchResults.innerHTML = '';
+                return;
+            }
+
+            const results = markers.filter(item => 
+                item.point.name.toLowerCase().includes(query)
+            );
+
+            if (results.length > 0) {
+                searchResults.innerHTML = results.map(item => `
+                    <div class="search-result-item" data-index="${markers.indexOf(item)}">
+                        <div class="search-result-name">${item.point.name}</div>
+                        <div class="search-result-type">${item.point.type} · ${item.point.count}只 · ${item.point.status}</div>
+                    </div>
+                `).join('');
+                searchResults.classList.add('show');
+            } else {
+                searchResults.innerHTML = '<div class="search-result-item">未找到结果</div>';
+                searchResults.classList.add('show');
+            }
+        });
+
+        searchResults.addEventListener('click', (e) => {
+            const item = e.target.closest('.search-result-item');
+            if (item && item.dataset.index !== undefined) {
+                const index = parseInt(item.dataset.index);
+                const { point, marker } = markers[index];
+                map.setView([point.lat, point.lng], 17);
+                marker.openPopup();
+                searchResults.classList.remove('show');
+                searchInput.value = point.name;
+            }
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !searchResults.contains(e.target)) {
+                searchResults.classList.remove('show');
+            }
+        });
+    </script>
+</body>
+</html>
